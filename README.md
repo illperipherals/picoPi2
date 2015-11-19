@@ -97,9 +97,3 @@ Just select what you want:
  Correct SETTINGS (Y/N) $>
 
 ```
-
-
-
-# picoPi2
-# picoPi2
-# picoPi2
