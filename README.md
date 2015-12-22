@@ -10,7 +10,7 @@ you can compile picoPi2Std to output it directly in STD
 
 maybe like this:
 
-./picoPi2std | aplay -r 16000
+./picoPi2Std | aplay -f S16_LE -r 16000
 
 It can save some IOPS-&-MMC-life time/duration
 
