@@ -6,6 +6,9 @@
 
 #include "TtsEngine.h"
 
+#define VAL_TO_STR(val) TO_STR(val)
+#define TO_STR(name) #name
+
 #define OUTPUT_BUFFER_SIZE (128 * 1024)
 
 using namespace android;
@@ -14,6 +17,37 @@ static bool synthesis_complete = false;
 
 static FILE *outfp = stdout;
 
+    /*
+        UK English - eng / GBR
+        US English - eng / USA
+        French - fra / FRA
+        German - deu / DEU
+        Spanish - spa / SPA
+        Italian - ita / ITA
+    */
+const char * getLanguage(const char * selector)
+{
+  if (strncmp(selector, "ITA", 3) == 0)
+  {
+      return "ita";
+  } 
+   else if (strncmp(selector, "FRA", 3) == 0)
+  {
+      return "fra";
+  } 
+   else if (strncmp(selector, "SPA", 3) == 0)
+  {
+      return "spa";
+  } 
+   else if (strncmp(selector, "DEU", 3) == 0)
+  {
+      return "deu";
+  } 
+   else 
+  {
+    return "eng";
+  }
+}
 // @param [inout] void *&       - The userdata pointer set in the original
 //                                 synth call
 // @param [in]    uint32_t      - Track sampling rate in Hz
@@ -61,6 +95,7 @@ int main(int argc, char *argv[])
     char* synthInput = NULL;
     int currentOption;
     char* outputFilename = NULL;
+    const char* ttsLang = NULL;
     const char* appName = NULL;
 
     appName = argv[0];
@@ -110,10 +145,11 @@ int main(int argc, char *argv[])
     }
 
     // ---------------------------------------------------------------------------------
-    // Force English for now
-    result = ttsEngine->setLanguage("eng", "USA", "");
-    //result = ttsEngine->setLanguage("fra", "FRA", "");
-
+#ifdef TTSLANG
+    ttsLang = VAL_TO_STR( TTSLANG ) ;
+#else  
+    ttsLang = "USA";
+#endif
     /*
         UK English - eng / GBR
         US English - eng / USA
@@ -122,6 +158,8 @@ int main(int argc, char *argv[])
         Spanish - spa / SPA
         Italian - ita / ITA
     */
+    fprintf(stderr, "locale %s/%s\n", getLanguage(ttsLang), ttsLang);
+    result = ttsEngine->setLanguage(getLanguage(ttsLang), ttsLang, "");
 
     // ---------------------------------------------------------------------------------
 
