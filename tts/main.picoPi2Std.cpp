@@ -45,11 +45,11 @@ tts_callback_status synth_done(void *& userdata, uint32_t sample_rate,
     return TTS_CALLBACK_CONTINUE;
 }
 
-static void usage(void)
+static void usage(const char * name)
 {
-    fprintf(stderr, "\nUsage:\n\n" \
-                    "testtts [-o filename] \"Text to speak\"\n\n" \
-                    "  -o\tFile to write audio to (default stdout)\n");
+    fprintf(stderr, "\nUsage:\n\n%s " \
+                    "\t[-o filename] \"Text to speak\"\n\n" \
+                    "\t-o\tFile to write audio to (default stdout)\n", name);
     exit(0);
 }
 
@@ -61,12 +61,14 @@ int main(int argc, char *argv[])
     char* synthInput = NULL;
     int currentOption;
     char* outputFilename = NULL;
+    const char* appName = NULL;
 
-    fprintf(stderr, "Pico TTS Test App\n");
+    appName = argv[0];
+    fprintf(stderr, "%s\n", appName);
 
     if (argc == 1)
     {
-        usage();
+        usage(appName);
     }
 
     while ( (currentOption = getopt(argc, argv, "o:h")) != -1)
@@ -78,7 +80,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Output audio to file '%s'\n", outputFilename);
             break;
         case 'h':
-            usage();
+            usage(appName);
             break;
         default:
             printf ("Getopt returned character code 0%o ??\n", currentOption);
@@ -93,7 +95,7 @@ int main(int argc, char *argv[])
     if (!synthInput)
     {
         fprintf(stderr, "Error: no input string\n");
-        usage();
+        usage(appName);
     }
 
     fprintf(stderr, "Input string: \"%s\"\n", synthInput);
