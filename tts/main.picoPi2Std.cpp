@@ -87,6 +87,22 @@ static void usage(const char * name)
     exit(0);
 }
 
+static char* PackageInt(int source, int length=2)
+{
+    if((length!=2)&&(length!=4))
+        return NULL;
+    char* retVal = new char[length];
+    retVal[0] = (char)(source & 0xFF);
+    retVal[1] = (char)((source >> 8) & 0xFF);
+    if (length == 4)
+    {
+        retVal[2] = (char) ((source >> 0x10) & 0xFF);
+        retVal[3] = (char) ((source >> 0x18) & 0xFF);
+    }
+    return retVal;
+}
+
+
 int main(int argc, char *argv[])
 {
     tts_result result;
@@ -97,6 +113,22 @@ int main(int argc, char *argv[])
     char* outputFilename = NULL;
     const char* ttsLang = NULL;
     const char* appName = NULL;
+
+    const char RIFF_HEADER[]    = { 0x52, 0x49, 0x46, 0x46 }; //RIFF
+    const char FORMAT_WAVE[]    = { 0x57, 0x41, 0x56, 0x45 }; //WAVE
+    const char FORMAT_TAG[]     = { 0x66, 0x6d, 0x74, 0x20 }; //fmt<space>
+    const char AUDIO_FORMAT[]   = { 0x01, 0x00 };             //'SOH' 'NUL' {10}
+    const char SUBCHUNK_ID[]    = { 0x64, 0x61, 0x74, 0x61 }; //data
+    const int BYTES_PER_SAMPLE  = 2;
+
+    const int sampleRate = 16000;
+    int channelCount = 1;
+    fpos_t pos_file_size;
+    fpos_t pos_data_size;
+
+    int charRate = sampleRate * channelCount * BYTES_PER_SAMPLE;
+    int blockAlign = channelCount * BYTES_PER_SAMPLE;
+
 
     appName = argv[0];
     fprintf(stderr, "%s\n", appName);
@@ -118,13 +150,14 @@ int main(int argc, char *argv[])
             usage(appName);
             break;
         default:
-            printf ("Getopt returned character code 0%o ??\n", currentOption);
+            fprintf(stderr, "Getopt returned character code 0%o ??\n", currentOption);
         }
     }
 
     if (optind < argc)
     {
         synthInput = argv[optind];
+	fprintf(stderr, "Output audio to file '%s'\n", outputFilename);
     }
 
     if (!synthInput)
@@ -170,12 +203,38 @@ int main(int argc, char *argv[])
 
     if (outputFilename)
     {
-        outfp = fopen(outputFilename, "wb");
+      outfp = fopen(outputFilename, "wb");
+
+      fwrite (RIFF_HEADER, 4, 1, outfp);                      // RIFF marker                              0  [4] Bytes
+      fgetpos (outfp, &pos_file_size);
+      fwrite (PackageInt(0, 4), 4, 1, outfp);                 // file-size (equals file-size - 8)         4  [4] Bytes
+      fwrite (FORMAT_WAVE, 4, 1, outfp);                      // Mark it as type "WAVE"                   8  [4] Bytes
+      fwrite (FORMAT_TAG, 4, 1, outfp);                       // Mark the format section                  12 [4] Bytes
+      fwrite (PackageInt(16, 4), 4, 1, outfp);                // Length of format data. Always 16         16 [4] Bytes
+      fwrite (AUDIO_FORMAT, 2, 1, outfp);                     // Wave type PCM                            20 [2] Bytes
+      fwrite (PackageInt(1, 2), 2, 1, outfp);                 // 1 Channel                                22 [2] Bytes
+      fwrite (PackageInt(16000, 4), 4, 1, outfp);             // 16 kHz sample rate                       24 [4] Bytes
+      fwrite (PackageInt(32000, 4), 4, 1, outfp);             // (Sample Rate * Bit Size * Channels) / 8  28 [4] Bytes
+      fwrite (PackageInt(2, 2), 2, 1, outfp);                 // (Bit Size * Channels) / 8                32 [2] Bytes
+      fwrite (PackageInt(16, 2), 2, 1, outfp);                // Bits per sample (=Bit Size * Samples)    34 [4] Bytes
+      fwrite (SUBCHUNK_ID, 4, 1, outfp);                      // "data" marker                            36 [4] Bytes
+      fgetpos (outfp, &pos_data_size);
+      fwrite (PackageInt(0, 4), 4, 1, outfp);                 // data-size (equals file-size - 44         40 [4] Bytes
+
+      /*Output
+      * IR FF (size) AW EV mf ' 't (16) 'NULL''NULL' 'NUL''SOH' 'NUL''SOH' >'ç' 'NUL''NUL'
+      *
+      *
+      */
+    }
+    else
+    {
+      outfp = stdout;
     }
 
     fprintf(stderr, "Synthesising text...\n");
 
-    result = ttsEngine->synthesizeText(argv[1], synthBuffer, OUTPUT_BUFFER_SIZE, NULL);
+    result = ttsEngine->synthesizeText(synthInput, synthBuffer, OUTPUT_BUFFER_SIZE, NULL);
 
     if (result != TTS_SUCCESS)
     {
@@ -191,7 +250,17 @@ int main(int argc, char *argv[])
 
     if (outputFilename)
     {
-        fclose(outfp);
+      int sizeOfFile = 0;
+      sizeOfFile = ftell(outfp);
+
+      fsetpos (outfp, &pos_file_size);
+      fwrite (PackageInt((sizeOfFile -  8), 4), 4, 1, outfp); // file-size (equals file-size - 8)         8  Bytes
+
+      fsetpos (outfp, &pos_data_size);
+      fwrite (PackageInt((sizeOfFile - 44), 4), 4, 1, outfp); // data-size (equals file-size - 44         44 Bytes
+
+      fseek(outfp,0,SEEK_END);
+      fclose(outfp);
     }
 
     result = ttsEngine->shutdown();
