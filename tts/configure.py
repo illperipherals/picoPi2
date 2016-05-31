@@ -186,7 +186,7 @@ class ConfirugePicoPi(object):
 
         if self.TO_STD:
 
-            subprocess.call("make -f ./Makefile.picoPi2Std.mkf", shell=True);
+            subprocess.call("make LANGTTS=" +self.LANG_TTS + " -f ./Makefile.picoPi2Std.mkf", shell=True);
         else:
 
             subprocess.call("make -f ./Makefile.picoPi2Wav.mkf", shell=True);
